@@ -1,0 +1,7 @@
+node_modules/
+dist/
+# `npm run prepare-basis` üretir (node_modules'tan kopyalanır, indirilmez)
+public/basis/
+.env
+.DS_Store
+*.log
