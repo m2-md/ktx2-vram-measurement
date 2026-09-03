@@ -4,6 +4,8 @@
 **▶ [Live demo](https://m2-md.github.io/ktx2-vram-measurement/)** · [Source](https://github.com/m2-md/ktx2-vram-measurement)
 <!-- LINKS:END -->
 
+> Measuring actual GPU VRAM usage of compressed textures: block alignment, mipchain overhead, cubemap multiplier, KTX2 transcoding targets, and compressedTexImage2D probes.
+
 Working code for the article "The Shipping Box Shrank, the Shelf Didn't: A Single 4K Texture
 Is ~90 MB of VRAM and What KTX2 Actually Buys You". It turns the space a texture takes **on
 the shelf** (in VRAM) into a formula, proves that formula deterministically with vitest, and
