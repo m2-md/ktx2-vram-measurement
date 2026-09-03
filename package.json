@@ -1,7 +1,7 @@
 {
   "name": "ktx2-vram-measurement",
   "version": "1.0.0",
-  "description": "Doku belleğini byte-per-pixel formülüyle ölçmek: blok hizalaması, mip zinciri, cubemap çarpanı, KTX2 transcode hedefi ve formülü sürücüye compressedTexImage2D ile doğrulatan bir tarayıcı probu",
+  "description": "Measuring actual GPU VRAM usage of compressed textures: block alignment, mipchain overhead, cubemap multiplier, KTX2 transcoding targets, and compressedTexImage2D probes.",
   "type": "module",
   "license": "MIT",
   "scripts": {

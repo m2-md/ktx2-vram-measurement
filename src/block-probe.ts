@@ -6,8 +6,8 @@ export interface BlockProbeResult {
   width: number;
   height: number;
   expectedBytes: number;
-  exactAccepted: boolean; // formülün verdiği bayt → sürücü kabul etti mi?
-  shortRejected: boolean; // bir bayt eksik → sürücü reddetti mi?
+  exactAccepted: boolean; // bytes calculated by formula → did the driver accept?
+  shortRejected: boolean; // one byte short → did the driver reject?
 }
 
 export function probeBlockSize(
@@ -21,7 +21,7 @@ export function probeBlockSize(
   const texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
   while (gl.getError() !== gl.NO_ERROR) {
-    /* önceki hataları kuyruktan boşalt */
+    /* flush previous errors from the queue */
   }
 
   gl.compressedTexImage2D(gl.TEXTURE_2D, 0, glFormat, width, height, 0, new Uint8Array(expectedBytes));

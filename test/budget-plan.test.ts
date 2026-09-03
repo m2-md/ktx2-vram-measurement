@@ -4,27 +4,27 @@ import { MOBILE_TEXTURE_BUDGET_BYTES, comparisonRows, howManyFit } from "../src/
 
 const BUDGET = MOBILE_TEXTURE_BUDGET_BYTES;
 
-describe("256 MiB'lık rafa ne sığar", () => {
-  it("bütçe 256 MiB = 268.435.456 bayt", () => {
+describe("what fits on a 256 MiB shelf", () => {
+  it("budget 256 MiB = 268,435,456 bytes", () => {
     expect(BUDGET).toBe(268_435_456);
     expect(BUDGET / (1024 * 1024)).toBe(256);
   });
 
-  it("mip'li 4K RGBA8 → 3 tane, bütçeden 4 bayt artar", () => {
+  it("mipped 4K RGBA8 → 3 textures, 4 bytes remain from budget", () => {
     expect(howManyFit(BUDGET, 89_478_484)).toBe(3);
     expect(BUDGET - 3 * 89_478_484).toBe(4);
   });
 
-  it("mip'li 4K BC7 → 11 tane; 12'nci bütçeyi 320 baytla aşar", () => {
+  it("mipped 4K BC7 → 11 textures; 12th exceeds budget by 320 bytes", () => {
     expect(howManyFit(BUDGET, 22_369_648)).toBe(11);
     expect(12 * 22_369_648 - BUDGET).toBe(320);
   });
 
-  it("mip'li 4K BC1 → 23 tane", () => {
+  it("mipped 4K BC1 → 23 textures", () => {
     expect(howManyFit(BUDGET, 11_184_824)).toBe(23);
   });
 
-  it("comparisonRows(4096) makaledeki tabloyu birebir üretir", () => {
+  it("comparisonRows(4096) reproduces the article table exactly", () => {
     const rows = comparisonRows(4096);
     expect(rows.map((r) => [r.label, r.baseBytes, r.mippedBytes, r.fits])).toEqual([
       ["RGBA16F", 134_217_728, 178_956_968, 1],
@@ -34,7 +34,7 @@ describe("256 MiB'lık rafa ne sığar", () => {
     ]);
   });
 
-  it("comparisonRows(2048) demo satırlarını üretir", () => {
+  it("comparisonRows(2048) produces demo rows", () => {
     const rows = comparisonRows(2048);
     const byFormat = new Map(rows.map((r) => [r.format, r]));
     expect(byFormat.get("RGBA8")?.mippedBytes).toBe(22_369_620);

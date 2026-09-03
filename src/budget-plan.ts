@@ -6,23 +6,23 @@ export function howManyFit(budgetBytes: number, perTextureBytes: number): number
 }
 
 /**
- * Orta seviye bir mobil cihazda doku için ayırabileceğiniz gerçekçi pay: 256 MiB.
- * Spesifikasyon değil, saha kuralı — ama hesap yapmak için bir sayı gerekiyor.
+ * Realistic texture budget share for a mid-range mobile device: 256 MiB.
+ * Not a specification, but a field rule of thumb — yet a number is needed for calculation.
  */
 export const MOBILE_TEXTURE_BUDGET_BYTES = 268_435_456;
 
 export interface ComparisonRow {
   format: FormatKey;
   label: string;
-  /** Taban seviye (mip yok) */
+  /** Base level (no mips) */
   baseBytes: number;
-  /** Tam mip zinciriyle */
+  /** With full mip chain */
   mippedBytes: number;
-  /** 256 MiB bütçeye kaç tane sığar (mip dâhil) */
+  /** How many fit into 256 MiB budget (including mips) */
   fits: number;
 }
 
-/** Makaledeki karşılaştırma tablosunun tek kaynağı: aynı doku, dört formatta. */
+/** Single source of truth for the article's comparison table: same texture in four formats. */
 export function comparisonRows(size: number, budgetBytes = MOBILE_TEXTURE_BUDGET_BYTES): ComparisonRow[] {
   const formats: { format: FormatKey; label: string }[] = [
     { format: "RGBA16F", label: "RGBA16F" },

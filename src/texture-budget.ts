@@ -18,7 +18,7 @@ export interface RendererInfoLike {
 }
 
 export class TextureBudget {
-  // Anahtar Texture nesnesinin KENDİSİ → paylaşılan atlas bir kez sayılır
+  // Key is the Texture object ITSELF → shared atlas is counted once
   private readonly entries = new Map<THREE.Texture, BudgetEntry>();
 
   addTexture(texture: THREE.Texture, name?: string): BudgetEntry | null {
@@ -26,13 +26,13 @@ export class TextureBudget {
     if (existing) return existing;
 
     const { width, height } = sizeOfTexture(texture);
-    if (width === 0 || height === 0) return null; // kaynağı henüz yüklenmemiş
+    if (width === 0 || height === 0) return null; // source not loaded yet
 
     const format = formatOfTexture(texture);
     const levels = levelsOfTexture(texture);
     const layers = layersOfTexture(texture);
     const entry: BudgetEntry = {
-      name: name ?? texture.name ?? "(isimsiz)",
+      name: name ?? texture.name ?? "(unnamed)",
       width,
       height,
       format,
@@ -45,7 +45,7 @@ export class TextureBudget {
   }
 
   addMaterial(material: THREE.Material, owner: string): void {
-    // 7 slotluk sabit liste değil: materyalin BÜTÜN doku alanlarını tara
+    // Not a fixed 7-slot list: traverse all texture fields of the material
     for (const [slot, value] of Object.entries(material)) {
       if (value instanceof THREE.Texture) this.addTexture(value, `${owner}.${slot}`);
     }

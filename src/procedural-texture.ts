@@ -1,8 +1,8 @@
-// procedural-texture.ts — desen PROSEDÜREL üretilir; hiçbir varlık indirilmez.
-// Tek amaç: kargo sütununu (PNG/WebP baytı) oynatırken raf sütununun (VRAM)
-// kıpırdamadığını göstermek. Gürültü entropiyi değiştirir, boyutu değiştirmez.
+// procedural-texture.ts — pattern is PROCEDURALLY generated; no assets downloaded.
+// Single goal: while varying cargo column (PNG/WebP bytes), show shelf column (VRAM)
+// remains completely unchanged. Noise changes entropy, not dimensions.
 
-/** mulberry32 — serideki diğer projelerle birebir aynı; seed sabit → desen deterministik. */
+/** mulberry32 — identical to other projects in the series; fixed seed → deterministic pattern. */
 export function makeRng(seed: number): () => number {
   let s = seed >>> 0;
   return () => {
@@ -15,14 +15,14 @@ export function makeRng(seed: number): () => number {
 
 export interface PatternOptions {
   seed?: number;
-  /** 0 → düz radyal gradyan (PNG küçük) · 1 → piksel başına rastgele sapma (PNG büyük) */
+  /** 0 → flat radial gradient (PNG small) · 1 → random deviation per pixel (PNG large) */
   noise?: number;
 }
 
 /**
- * `canvas`'ı `size × size` yapar ve deseni çizer. Gradyan + neon halkalar 2D bağlamda,
- * gürültü ise tek bir `ImageData` geçişinde uygulanır (piksel başına TEK RNG çağrısı;
- * aynı sapma R/G/B'ye farklı katsayılarla dağıtılır — kanal başına ayrı çağrı yok).
+ * Sets `canvas` to `size × size` and draws the pattern. Gradient + neon rings in 2D context,
+ * while noise is applied in a single `ImageData` pass (single RNG call per pixel;
+ * same deviation is distributed to R/G/B with different coefficients — no separate per-channel call).
  */
 export function drawPattern(canvas: HTMLCanvasElement, size: number, options: PatternOptions = {}): void {
   const { seed = 1337, noise = 0 } = options;
@@ -30,9 +30,9 @@ export function drawPattern(canvas: HTMLCanvasElement, size: number, options: Pa
   canvas.height = size;
 
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("2D context alınamadı");
+  if (!ctx) throw new Error("Could not get 2D context");
 
-  // Düşük entropili taban: radyal gradyan + birkaç neon halka.
+  // Low-entropy base: radial gradient + a few neon rings.
   const g = ctx.createRadialGradient(size * 0.42, size * 0.36, 0, size * 0.5, size * 0.5, size * 0.78);
   g.addColorStop(0, "#1b2740");
   g.addColorStop(0.45, "#0d1526");
@@ -52,7 +52,7 @@ export function drawPattern(canvas: HTMLCanvasElement, size: number, options: Pa
 
   if (noise <= 0) return;
 
-  // Gürültü: entropiyi yükseltir → PNG/WebP büyür. VRAM'e etkisi SIFIR.
+  // Noise: increases entropy → PNG/WebP grows. Zero impact on VRAM.
   const rng = makeRng(seed);
   const image = ctx.getImageData(0, 0, size, size);
   const data = image.data;

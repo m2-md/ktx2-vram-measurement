@@ -35,19 +35,19 @@ type BasisFormat = "ETC1S" | "UASTC";
 
 interface TargetOption {
   requires: keyof FormatSupport | null;
-  /** `[alfasız, alfalı]`. TEK elemanlı satır = o format alfa taşıyamaz. */
+  /** `[noAlpha, withAlpha]`. Single-element row = that format cannot carry alpha. */
   engineFormat: readonly FormatKey[];
   priorityETC1S: number;
   priorityUASTC: number;
   needsPowerOfTwo: boolean;
 }
 
-// three'nin KTX2Loader.js dosyasındaki FORMAT_OPTIONS tablosunun ETC1S/UASTC alt kümesi
-// (PVRTC ve UASTC_HDR satırları bilerek dışarıda — bu projede o formatlar yok)
+// ETC1S/UASTC subset of the FORMAT_OPTIONS table in three's KTX2Loader.js
+// (PVRTC and UASTC_HDR rows are deliberately excluded — not in this project)
 //
-// Dizi UZUNLUKLARI da tablonun bir parçası: ETC1'in alfa kanalı yoktur, o yüzden
-// three'de o satır tek elemanlıdır ve alfa istendiğinde atlanır. Satırı ["ETC1","ETC1"]
-// diye doldurmak alfayı bedava gösterir ve VRAM'i 2×–8× EKSİK tahmin ettirir.
+// Array lengths are also part of the table: ETC1 has no alpha channel, which is why
+// in three that row has a single element and is skipped when alpha is requested. Filling the row
+// as ["ETC1","ETC1"] would make alpha look free and cause VRAM to be underestimated by 2×–8×.
 // prettier-ignore
 const TARGETS: readonly TargetOption[] = [
   { requires: "astc",  engineFormat: ["ASTC_4x4", "ASTC_4x4"],  priorityETC1S: Infinity, priorityUASTC: 1, needsPowerOfTwo: false },
@@ -73,9 +73,9 @@ export function pickTranscodeTarget(
   for (const opt of sorted) {
     if (opt.requires && !support[opt.requires]) continue;
     if (basisFormat === "ETC1S" && opt.priorityETC1S === Infinity) continue;
-    // three'nin koruması: alfa isteniyorsa alfa taşıyamayan satırı atla.
-    // ETC1-var / ETC2-yok bir GPU'da alfalı doku ETC1'e DEĞİL, bir sonraki
-    // uygun hedefe (BC3/BC7) ya da RGBA8'e gider.
+    // three's guard: if alpha is requested, skip rows that cannot carry alpha.
+    // On a GPU with ETC1 but no ETC2, an alpha texture does not go to ETC1, but to the next
+    // suitable target (BC3/BC7) or RGBA8.
     if (hasAlpha && opt.engineFormat.length < 2) continue;
     const format = opt.engineFormat[hasAlpha ? 1 : 0];
     return { format, compressed: FORMATS[format].compressed };

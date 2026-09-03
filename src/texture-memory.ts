@@ -1,9 +1,9 @@
 // texture-memory.ts
 export interface FormatSpec {
   label: string;
-  blockWidth: number; // sıkıştırılmamış formatlarda 1
+  blockWidth: number; // 1 in uncompressed formats
   blockHeight: number;
-  blockBytes: number; // bir bloğun bayt karşılığı
+  blockBytes: number; // byte size of a block
   compressed: boolean;
 }
 
@@ -45,7 +45,7 @@ export function levelBytes(width: number, height: number, format: FormatKey): nu
   return cols * rows * f.blockBytes;
 }
 
-/** floor(log2(max(w,h))) + 1 — kayan nokta hatasına açık olmayan hâli. */
+/** floor(log2(max(w,h))) + 1 — version immune to floating point errors. */
 export function mipLevelCount(width: number, height: number): number {
   const size = Math.max(1, Math.max(width, height) | 0);
   return 32 - Math.clz32(size);
@@ -53,8 +53,8 @@ export function mipLevelCount(width: number, height: number): number {
 
 export interface MemoryOptions {
   mipmaps?: boolean;
-  levels?: number; // hazır bir mip zinciri varsa (CompressedTexture.mipmaps.length)
-  layers?: number; // cubemap = 6, array texture = katman sayısı
+  levels?: number; // if an existing mip chain exists (CompressedTexture.mipmaps.length)
+  layers?: number; // cubemap = 6, array texture = layer count
 }
 
 export function estimateTextureMemory(
@@ -72,11 +72,11 @@ export function estimateTextureMemory(
   return bytes * layers;
 }
 
-// --- sunum yardımcısı (makalede geçmez; paneller ve tablolar için) ---
+// --- presentation helper (not in article; for panels and tables) ---
 
-/** Bayt → "89.478.484 B (85,33 MiB)". Kod hep bayt, ekran hep MiB. */
+/** Bytes → "89,478,484 B (85.33 MiB)". Code is always bytes, display is always MiB. */
 export function formatBytes(bytes: number): string {
   const mib = bytes / (1024 * 1024);
-  const mibText = mib.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `${bytes.toLocaleString("tr-TR")} B (${mibText} MiB)`;
+  const mibText = mib.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${bytes.toLocaleString("en-US")} B (${mibText} MiB)`;
 }

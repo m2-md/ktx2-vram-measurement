@@ -1,4 +1,4 @@
-// three-format.ts (özet)
+// three-format.ts (summary)
 import * as THREE from "three";
 import { mipLevelCount, type FormatKey } from "./texture-memory";
 
@@ -33,7 +33,7 @@ export function formatOfTexture(texture: THREE.Texture): FormatKey {
   if (texture.type === THREE.HalfFloatType) return "RGBA16F";
   if (texture.format === THREE.RedFormat) return "R8";
   if (texture.format === THREE.RGFormat) return "RG8";
-  return "RGBA8"; // three r137'den beri RGBFormat yok: RGB kaynak da RGBA8 olarak yatar
+  return "RGBA8"; // Since three r137 RGBFormat is deprecated: RGB source also resides as RGBA8
 }
 
 export function levelsOfTexture(texture: THREE.Texture): number {
@@ -45,9 +45,9 @@ export function levelsOfTexture(texture: THREE.Texture): number {
   return wantsMips ? mipLevelCount(width, height) : 1;
 }
 
-// --- boyut ve katman köprüleri (makalede "özet" olarak kısaltıldı) ---
+// --- dimension and layer bridges (abbreviated as "summary" in the article) ---
 
-/** `texture.image` bir ImageBitmap, canvas, {width,height,depth} ya da bunların dizisi olabilir. */
+/** `texture.image` can be an ImageBitmap, canvas, {width,height,depth}, or an array of these. */
 interface ImageLike {
   width?: number;
   height?: number;
@@ -57,7 +57,7 @@ interface ImageLike {
 function imageOf(texture: THREE.Texture): ImageLike | undefined {
   const image = texture.image as ImageLike | ImageLike[] | null | undefined;
   if (!image) return undefined;
-  return Array.isArray(image) ? image[0] : image; // CubeTexture → altı yüzün ilki
+  return Array.isArray(image) ? image[0] : image; // CubeTexture → first of six faces
 }
 
 export function sizeOfTexture(texture: THREE.Texture): { width: number; height: number } {

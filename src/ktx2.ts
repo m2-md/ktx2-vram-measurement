@@ -4,9 +4,9 @@ import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 
 export function createKTX2Loader(renderer: THREE.WebGLRenderer): KTX2Loader {
   const loader = new KTX2Loader();
-  // basis_transcoder.js + .wasm → node_modules/three/examples/jsm/libs/basis/'ten public/basis/'e kopyalanır
+  // basis_transcoder.js + .wasm → copied from node_modules/three/examples/jsm/libs/basis/ to public/basis/
   loader.setTranscoderPath("/basis/");
-  loader.detectSupport(renderer); // GPU'ya sorar, transcode hedefini belirler
+  loader.detectSupport(renderer); // Queries GPU and determines transcode target
   return loader;
 }
 
@@ -19,7 +19,7 @@ export interface WorkerConfig {
   pvrtcSupported: boolean;
 }
 
-/** detectSupport'un GPU'dan topladığı sonucu okunur hâle getirir. */
+/** Makes the result collected by detectSupport from the GPU readable. */
 export function readWorkerConfig(loader: KTX2Loader): WorkerConfig | null {
   return (loader as unknown as { workerConfig?: WorkerConfig }).workerConfig ?? null;
 }

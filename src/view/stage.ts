@@ -1,14 +1,14 @@
-// view/stage.ts — sunum katmanı: dark cinematic + neon, ama BİLEREK HAFİF.
-// Gölge YOK, post-process YOK, en fazla 3 mesh. Render on-demand: animasyon döngüsü
-// yalnızca "Döndür" işaretlenirse çalışır. Ölçülen renderer bu renderer'dır —
-// `renderer.info.memory.textures` buradan okunur.
+// view/stage.ts — presentation layer: dark cinematic + neon, but DELIBERATELY LIGHTWEIGHT.
+// No shadows, no post-process, at most 3 meshes. Render on-demand: animation loop
+// only runs if "Spin" is checked. Measured renderer is this renderer —
+// `renderer.info.memory.textures` is read from here.
 import * as THREE from "three";
 
 export interface Stage {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
-  /** Doku takılabilen iki kutu materyali (üçüncü kutu referans olarak dokusuz kalır). */
+  /** Two box materials where textures can be slotted (third box remains textureless as reference). */
   slots: THREE.MeshStandardMaterial[];
   render(): void;
   setSpinning(on: boolean): void;
@@ -16,7 +16,7 @@ export interface Stage {
 
 export function createStage(container: HTMLElement): Stage {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // hafiflik: 1.5 ile sınırla
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // lightweight: cap at 1.5
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.15;
   renderer.setClearColor(0x05060b, 1);
@@ -29,7 +29,7 @@ export function createStage(container: HTMLElement): Stage {
   camera.position.set(0, 1.5, 6.4);
   camera.lookAt(0, 0.1, 0);
 
-  // Neon ışıklar — gölge haritası YOK, dolayısıyla ekstra doku da yok.
+  // Neon light — no shadow map, therefore no extra texture either.
   scene.add(new THREE.AmbientLight(0x24304a, 1.4));
   const cyan = new THREE.PointLight(0x22d3ee, 55, 22, 2);
   cyan.position.set(-3.2, 2.6, 3.2);
@@ -39,7 +39,7 @@ export function createStage(container: HTMLElement): Stage {
   rim.position.set(0.5, 3, -4);
   scene.add(cyan, magenta, rim);
 
-  // Zemin: tek quad, dokusuz, yansımasız.
+  // Ground: single quad, no texture, no reflection.
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(40, 40),
     new THREE.MeshStandardMaterial({ color: 0x0a0f1a, roughness: 0.92, metalness: 0.1 }),
@@ -52,7 +52,7 @@ export function createStage(container: HTMLElement): Stage {
   grid.position.y = -1.04;
   scene.add(grid);
 
-  // Üç kutu: ilk ikisi doku slotu, üçüncüsü dokusuz referans.
+  // Three boxes: first two are texture slots, third is textureless reference.
   const slots: THREE.MeshStandardMaterial[] = [];
   const group = new THREE.Group();
   const positions = [-1.85, 0, 1.85];
@@ -63,7 +63,7 @@ export function createStage(container: HTMLElement): Stage {
       metalness: 0.22,
     });
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), material);
-    mesh.name = i === 2 ? "referans" : `slot${i}`;
+    mesh.name = i === 2 ? "reference" : `slot${i}`;
     mesh.position.set(positions[i], 0, i === 1 ? -0.35 : 0);
     mesh.rotation.y = (i - 1) * 0.42;
     group.add(mesh);

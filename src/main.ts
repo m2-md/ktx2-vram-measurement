@@ -1,10 +1,10 @@
-// main.ts — tarayıcı demosu. `file://` ile AÇILMAZ (boş ekran) → `npm run dev` (Vite).
+// main.ts — browser demo. Cannot be opened with `file://` (blank screen) → `npm run dev` (Vite).
 //
-// Sözleşme (makale bunu tarif ediyor):
-//   · aynı anda EN FAZLA 2 canlı büyük doku, üçüncüsü en eskisini dispose eder
-//   · prosedürel üretim üst sınırı 2048; 4K satırları yalnızca HESAPLANIR
-//   · otomatik süpürme YOK — her ölçüm düğmeyle tetiklenir
-//   · "Boşalt" dokuları dispose eder ve renderer.info.memory.textures baseline'a döner
+// Contract (as described in the article):
+//   · at most 2 live large textures at the same time; a third disposes the oldest
+//   · procedural generation upper limit is 2048; 4K rows are ONLY CALCULATED
+//   · no automatic garbage collection — every measurement is triggered by button
+//   · "Flush" disposes textures and returns renderer.info.memory.textures to baseline
 import * as THREE from "three";
 import { createStage } from "./view/stage";
 import { TextureBudget } from "./texture-budget";
@@ -16,12 +16,12 @@ import { encodedSizes } from "./file-size";
 import { drawPattern } from "./procedural-texture";
 import { MOBILE_TEXTURE_BUDGET_BYTES, comparisonRows } from "./budget-plan";
 
-const MAX_LIVE = 2; // aynı anda canlı kalabilen büyük doku sayısı
-const MAX_SIZE = 2048; // prosedürel üretim üst sınırı
+const MAX_LIVE = 2; // number of large textures that can remain live concurrently
+const MAX_SIZE = 2048; // upper limit for procedural generation
 
 const $ = (id: string): HTMLElement => {
   const el = document.getElementById(id);
-  if (!el) throw new Error(`#${id} yok`);
+  if (!el) throw new Error(`#${id} not found`);
   return el;
 };
 
@@ -30,9 +30,9 @@ const { renderer } = stage;
 const gl = renderer.getContext() as WebGL2RenderingContext;
 const budget = new TextureBudget();
 
-// Baseline: hiç doku üretilmemişken sayaç kaç? "Boşalt" buraya dönmeli.
+// Baseline: counter value when no textures have been generated. "Flush" must return here.
 stage.render();
-const baseline = renderer.info.memory.textures; // GPU'da duran doku SAYISI — bayt DEĞİL
+const baseline = renderer.info.memory.textures; // COUNT of textures in GPU — NOT bytes
 
 interface LiveTexture {
   texture: THREE.CanvasTexture;
@@ -45,7 +45,7 @@ interface LiveTexture {
 const live: LiveTexture[] = [];
 let noise = 0;
 
-// --- ölçüm geçmişi (kargo vs raf) ---
+// --- measurement history (cargo vs shelf) ---
 interface SizeRow {
   size: number;
   noise: number;
@@ -56,9 +56,9 @@ interface SizeRow {
 }
 const sizeRows: SizeRow[] = [];
 
-// ---------------------------------------------------------------- yardımcılar
+// ---------------------------------------------------------------- helpers
 
-const num = (n: number): string => n.toLocaleString("tr-TR");
+const num = (n: number): string => n.toLocaleString("en-US");
 const mark = (ok: boolean): string => (ok ? '<span class="yes">✓</span>' : '<span class="no">✗</span>');
 
 function table(headers: string[], rows: string[][], numericFrom = 1): string {
@@ -92,47 +92,47 @@ function refreshStats(): void {
   el.className = textures === baseline ? "v ok" : "v warn";
 }
 
-// ------------------------------------------------------------ doku üret / boşalt
+// ------------------------------------------------------------ generate / flush textures
 
 function generate(size: number): void {
-  const clamped = Math.min(size, MAX_SIZE); // 4096 ÜRETİLMEZ
-  if (live.length >= MAX_LIVE) disposeOne(0); // en eskisi gider
+  const clamped = Math.min(size, MAX_SIZE); // 4096 IS NOT GENERATED
+  if (live.length >= MAX_LIVE) disposeOne(0); // oldest gets removed
 
   const slot = live.length === 0 ? 0 : live[0].slot === 0 ? 1 : 0;
   const canvas = document.createElement("canvas");
   drawPattern(canvas, clamped, { seed: 1337, noise });
 
-  // CanvasTexture varsayılanı: generateMipmaps = true, minFilter = LinearMipmapLinear
-  // → mip zinciri VAR, yani ×4/3 devrede.
+  // CanvasTexture default: generateMipmaps = true, minFilter = LinearMipmapLinear
+  // → mip chain EXISTS, meaning ×4/3 is active.
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.name = `desen ${clamped}² (gürültü ${noise})`;
+  texture.name = `pattern ${clamped}² (noise ${noise})`;
 
   const material = stage.slots[slot];
   material.map = texture;
   material.needsUpdate = true;
 
   live.push({ texture, canvas, size: clamped, noise, slot });
-  stage.render(); // GPU'ya YÜKLE — sayaç ancak render'dan sonra artar
+  stage.render(); // UPLOAD to GPU — counter increments only after render
 
   refreshStats();
   setVerdict(
-    `<b>${clamped}²</b> doku üretildi (gürültü ${noise}). Rafta ` +
+    `<b>${clamped}²</b> texture generated (noise ${noise}). On shelf: ` +
       `${formatBytes(estimateTextureMemory(clamped, clamped, "RGBA8", { mipmaps: true }))} — ` +
-      `dosya boyutundan bağımsız.`,
+      `independent of file size.`,
   );
 }
 
 function disposeOne(index: number): void {
   const item = live[index];
   if (!item) return;
-  // ÖNCE materyalden kopar, SONRA dispose et. Ters sırada yapılırsa three bir
-  // sonraki render'da canvas'tan yeniden yükler ve sayaç geri tırmanır.
+  // detach from material first, then dispose. In reverse order, three reloads
+  // from canvas on the next render and the counter climbs back up.
   const material = stage.slots[item.slot];
   material.map = null;
   material.needsUpdate = true;
   item.texture.dispose();
-  item.canvas.width = 1; // CPU tarafındaki tamponu da bırak
+  item.canvas.width = 1; // release buffer on CPU side too
   item.canvas.height = 1;
   live.splice(index, 1);
 }
@@ -142,21 +142,21 @@ function flush(): void {
   budget.clear();
   stage.render();
   refreshStats();
-  $("budgetPanel").innerHTML = '<div class="empty">— bütçe boşaltıldı.</div>';
+  $("budgetPanel").innerHTML = '<div class="empty">— budget flushed.</div>';
 
   const textures = renderer.info.memory.textures;
   setVerdict(
     textures === baseline
-      ? `Boşaltıldı. <code>info.memory.textures</code> = <b>${textures}</b> — baseline (${baseline}) ile aynı. ` +
-          `Bütçe ölçen araç kendi kendine sızdırmıyor.`
-      : `Boşaltıldı ama sayaç ${textures}, baseline ${baseline}. Bir yerde referans kalmış.`,
+      ? `Flushed. <code>info.memory.textures</code> = <b>${textures}</b> — matches baseline (${baseline}). ` +
+          `The budget measurement tool does not leak.`
+      : `Flushed but counter is ${textures}, baseline is ${baseline}. A reference remains somewhere.`,
   );
 }
 
-// --------------------------------------------------------------- bütçeyi ölç
+// --------------------------------------------------------------- measure budget
 
 function measureBudget(): void {
-  stage.render(); // crossCheck'ten ÖNCE render: sayaç ancak yüklenmiş dokuları görür
+  stage.render(); // render BEFORE crossCheck: counter only sees uploaded textures
   budget.clear();
   budget.addScene(stage.scene);
 
@@ -165,11 +165,11 @@ function measureBudget(): void {
 
   if (rows.length === 0) {
     $("budgetPanel").innerHTML =
-      '<div class="empty">— sahnede ölçülecek doku yok. Önce <code>1024 üret</code> ya da <code>2048 üret</code>.</div>';
+      '<div class="empty">— no textures to measure in scene. First click <code>Generate 1024</code> or <code>Generate 2048</code>.</div>';
   } else {
     const html =
       table(
-        ["SLOT", "BOYUT", "FORMAT", "MIP", "KATMAN", "BAYT", "MiB"],
+        ["SLOT", "SIZE", "FORMAT", "MIP", "LAYER", "BYTES", "MiB"],
         rows.map((e) => [
           e.name,
           `${e.width}×${e.height}`,
@@ -177,28 +177,28 @@ function measureBudget(): void {
           String(e.levels),
           String(e.layers),
           num(e.bytes),
-          (e.bytes / 1048576).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          (e.bytes / 1048576).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         ]),
       ) +
-      `<div class="empty">TOPLAM <b>${formatBytes(budget.totalBytes)}</b> · ` +
-      `crossCheck: sayılan ${cross.counted}, GPU sayacı ${cross.gpu}, delta ${cross.delta} ` +
-      `<span class="dim">(delta'nın sıfır olması beklenmez)</span></div>`;
+      `<div class="empty">TOTAL <b>${formatBytes(budget.totalBytes)}</b> · ` +
+      `crossCheck: counted ${cross.counted}, GPU counter ${cross.gpu}, delta ${cross.delta} ` +
+      `<span class="dim">(delta is not expected to be zero)</span></div>`;
     $("budgetPanel").innerHTML = html;
   }
 
   refreshStats();
   setVerdict(
-    `Sayaç <b>${cross.gpu}</b> doku diyor; formül <b>${formatBytes(budget.totalBytes)}</b> diyor. ` +
-      `Üç sayı ile bir sayı arasındaki fark burada uçurum.`,
+    `Counter reports <b>${cross.gpu}</b> textures; formula reports <b>${formatBytes(budget.totalBytes)}</b>. ` +
+      `The difference between three numbers and one number is a chasm here.`,
   );
 }
 
-// ------------------------------------------------------- dosya boyutunu ölç
+// ------------------------------------------------------- measure file size
 
 async function measureFileSize(): Promise<void> {
   const item = live[live.length - 1];
   if (!item) {
-    setVerdict("Önce bir doku üretin — ölçülecek <code>&lt;canvas&gt;</code> yok.");
+    setVerdict("Generate a texture first — no <code>&lt;canvas&gt;</code> to measure.");
     return;
   }
 
@@ -221,8 +221,8 @@ async function measureFileSize(): Promise<void> {
     const vramFixed = sizeRows.every((r) => r.size !== item.size || r.vram === sizeRows[0].vram);
     setVerdict(
       `PNG <b>${num(sizeRows[0].png)} B</b>, WebP <b>${num(sizeRows[0].webp)} B</b>, VRAM ` +
-        `<b>${num(sizeRows[0].vram)} B</b>. Gürültüyü değiştirip yeniden üretin: ilk iki sütun oynar, ` +
-        `üçüncüsü ${vramFixed ? "kıpırdamaz" : "değişti (?!)"}.`,
+        `<b>${num(sizeRows[0].vram)} B</b>. Change noise and regenerate: first two columns fluctuate, ` +
+        `third ${vramFixed ? "remains fixed" : "changed (?!)"}.`,
     );
   } finally {
     button.disabled = false;
@@ -234,22 +234,22 @@ function renderSizePanel(): void {
     `${r.size}²`,
     String(r.noise),
     num(r.png),
-    r.webpSupported ? num(r.webp) : `${num(r.webp)} <span class="dim">(PNG döndü)</span>`,
-    '<span class="dim">— (encode edilmedi)</span>',
+    r.webpSupported ? num(r.webp) : `${num(r.webp)} <span class="dim">(returned PNG)</span>`,
+    '<span class="dim">— (not encoded)</span>',
     num(r.vram),
   ]);
   $("sizePanel").innerHTML =
-    table(["DOKU", "GÜRÜLTÜ", "PNG (B)", "WEBP q=0.85 (B)", "KTX2/ETC1S", "VRAM RGBA8+MIP (B)"], rows) +
-    '<div class="empty">Kargo sütunları içeriğin entropisine bakar; raf sütunu yalnızca genişlik, yükseklik ve formata.</div>';
+    table(["TEXTURE", "NOISE", "PNG (B)", "WEBP q=0.85 (B)", "KTX2/ETC1S", "VRAM RGBA8+MIP (B)"], rows) +
+    '<div class="empty">Cargo columns reflect content entropy; shelf column depends only on width, height, and format.</div>';
 }
 
-// ------------------------------------------------------ sürücü blok doğrulaması
+// ------------------------------------------------------ driver block validation
 
 function runProbe(): void {
   const formats = availableCompressedFormats(gl);
   if (formats.length === 0) {
     $("probePanel").innerHTML =
-      '<div class="empty">— bu GPU/tarayıcı hiçbir sıkıştırılmış doku uzantısı vermiyor. KTX2 burada RGBA8\'e açılır: VRAM kazancı SIFIR.</div>';
+      '<div class="empty">— this GPU/browser provides no compressed texture extensions. KTX2 unpacks to RGBA8 here: ZERO VRAM gain.</div>';
     return;
   }
 
@@ -259,14 +259,14 @@ function runProbe(): void {
       results.push({ ...probeBlockSize(gl, entry.key, entry.glFormat, size, size), label: entry.label });
     }
   }
-  // Ham GL çağrıları three'nin state cache'ini şaşırtır; senkronu geri al.
+  // raw GL calls confuse three's state cache; resync state.
   renderer.resetState();
   stage.render();
 
   const allPassed = results.every((r) => r.exactAccepted && r.shortRejected);
   $("probePanel").innerHTML =
     table(
-      ["FORMAT", "BOYUT", "BEKLENEN BAYT", "TAM BOYUT KABUL", "1 BAYT EKSİK RED"],
+      ["FORMAT", "SIZE", "EXPECTED BYTES", "EXACT SIZE ACCEPTED", "1 BYTE SHORT REJECTED"],
       results.map((r) => [
         r.label,
         `${r.width}×${r.height}`,
@@ -275,23 +275,23 @@ function runProbe(): void {
         mark(r.shortRejected),
       ]),
     ) +
-    `<div class="empty">${results.length} ölçüm · ${allPassed ? "hepsi geçti: formül sürücüyle birebir." : "bazı satırlar geçmedi — sürücü notuna bakın."}</div>`;
+    `<div class="empty">${results.length} measurements · ${allPassed ? "all passed: formula matches driver exactly." : "some rows failed — check driver notes."}</div>`;
 
   setVerdict(
     allPassed
-      ? `Sürücü hesabı onayladı: ${results.length} ölçümün tamamında doğru boyut kabul edildi, bir bayt eksiği reddedildi.`
-      : `Bazı satırlar beklendiği gibi çıkmadı; tabloya bakın. Bu da bir sonuçtur — uydurmuyoruz.`,
+      ? `Driver verified the formula: in all ${results.length} measurements exact size was accepted, one byte short was rejected.`
+      : `Some rows did not match expectations; see table. This is also a result — no fabricated numbers.`,
   );
 }
 
-// ------------------------------------------------------------------ GPU raporu
+// ------------------------------------------------------------------ GPU report
 
 function renderGpuPanel(): void {
   const support = detectFormatSupport(gl);
   const debug = gl.getExtension("WEBGL_debug_renderer_info");
   const gpuName = debug
     ? String(gl.getParameter((debug as { UNMASKED_RENDERER_WEBGL: number }).UNMASKED_RENDERER_WEBGL))
-    : "(WEBGL_debug_renderer_info kapalı)";
+    : "(WEBGL_debug_renderer_info disabled)";
 
   const loader = createKTX2Loader(renderer);
   const config = readWorkerConfig(loader);
@@ -311,9 +311,9 @@ function renderGpuPanel(): void {
       const bytes = estimateTextureMemory(2048, 2048, choice.format, { mipmaps: true });
       return [
         basisFormat,
-        hasAlpha ? "alfalı" : "alfasız",
+        hasAlpha ? "with alpha" : "no alpha",
         choice.format,
-        choice.compressed ? '<span class="yes">sıkıştırılmış</span>' : '<span class="no">RGBA8 — kazanç yok</span>',
+        choice.compressed ? '<span class="yes">compressed</span>' : '<span class="no">RGBA8 — no gain</span>',
         num(bytes),
       ];
     }),
@@ -321,24 +321,24 @@ function renderGpuPanel(): void {
 
   $("gpuPanel").innerHTML =
     `<div class="empty">GPU: <b>${gpuName}</b> · WebGL2: ${mark(renderer.capabilities.isWebGL2 !== false)}</div>` +
-    table(["UZANTI", "getExtension", "KTX2Loader.detectSupport"], supportRows) +
-    `<div class="empty" style="margin-top:10px">Bu GPU'da 2048² bir doku hangi formata açılır:</div>` +
-    table(["YÜK", "ALFA", "HEDEF", "DURUM", "VRAM (B, MIP DÂHİL)"], choices, 2);
+    table(["EXTENSION", "getExtension", "KTX2Loader.detectSupport"], supportRows) +
+    `<div class="empty" style="margin-top:10px">Format target for a 2048² texture on this GPU:</div>` +
+    table(["PAYLOAD", "ALPHA", "TARGET", "STATUS", "VRAM (B, INCL. MIP)"], choices, 2);
 }
 
 function renderPlanPanel(): void {
   const rows = comparisonRows(4096).map((r) => [
-    `${r.label} <span class="tag calc">hesaplandı</span>`,
+    `${r.label} <span class="tag calc">calculated</span>`,
     num(r.baseBytes),
     num(r.mippedBytes),
-    (r.mippedBytes / 1048576).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    (r.mippedBytes / 1048576).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     String(r.fits),
   ]);
   const demo = comparisonRows(2048).map((r) => [
     `${r.label} <span class="tag gpu">2048²</span>`,
     num(r.baseBytes),
     num(r.mippedBytes),
-    (r.mippedBytes / 1048576).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    (r.mippedBytes / 1048576).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     String(r.fits),
   ]);
 
@@ -347,14 +347,14 @@ function renderPlanPanel(): void {
 
   $("planPanel").innerHTML =
     table(
-      ["FORMAT", "4096² TABAN (B)", "+ MİP ZİNCİRİ (B)", "MiB", `${num(MOBILE_TEXTURE_BUDGET_BYTES)} B'A KAÇ TANE`],
+      ["FORMAT", "4096² BASE (B)", "+ MIP CHAIN (B)", "MiB", `HOW MANY IN ${num(MOBILE_TEXTURE_BUDGET_BYTES)} B`],
       [...rows, ...demo],
     ) +
-    `<div class="empty">4096² BC7 = ${num(bc7)} B · 2048² RGBA8 = ${num(rgba2k)} B · fark <b>${bc7 - rgba2k} bayt</b>. ` +
-    `Çözünürlüğü yarıya indirmek, tam çözünürlükte BC7'ye geçmekle rafta neredeyse birebir aynı yeri kazandırıyor.</div>`;
+    `<div class="empty">4096² BC7 = ${num(bc7)} B · 2048² RGBA8 = ${num(rgba2k)} B · delta <b>${bc7 - rgba2k} bytes</b>. ` +
+    `Halving the resolution saves nearly the exact same space on the shelf as switching to BC7 at full resolution.</div>`;
 }
 
-// ----------------------------------------------------------------------- olaylar
+// ----------------------------------------------------------------------- events
 
 $("gen1024").addEventListener("click", () => generate(1024));
 $("gen2048").addEventListener("click", () => generate(2048));
@@ -365,9 +365,9 @@ $("filesize").addEventListener("click", () => {
 });
 
 $("probe").addEventListener("click", () => {
-  setVerdict("Sürücüye soruluyor…");
-  // Bloke edici iş: status'ün boyanması için bir sonraki tick'e bırak.
-  // rAF DEĞİL setTimeout — arka plan sekmede rAF durur, setTimeout çalışır.
+  setVerdict("Querying driver…");
+  // Blocking work: defer to next tick so status paints.
+  // setTimeout instead of rAF — rAF halts in background tab, setTimeout runs.
   setTimeout(runProbe, 0);
 });
 
@@ -390,6 +390,6 @@ const FORMAT_SANITY: FormatKey[] = ["RGBA8", "BC7", "BC1"];
 console.log(
   "[boot] baseline textures =",
   baseline,
-  "· formül kontrolü:",
+  "· formula check:",
   FORMAT_SANITY.map((f) => `${f}=${estimateTextureMemory(4096, 4096, f, { mipmaps: true })}`).join(" "),
 );

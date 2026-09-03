@@ -13,7 +13,7 @@ export async function encodedSizes(
   const out: EncodedSize[] = [];
   for (const mime of mimes) {
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, mime, quality));
-    // Tarayıcı istenen formatı üretemezse sessizce PNG döner — type kontrolü şart
+    // If browser cannot produce requested format, it silently returns PNG — type check is required
     out.push({ mime, bytes: blob?.size ?? 0, supported: blob?.type === mime });
   }
   return out;

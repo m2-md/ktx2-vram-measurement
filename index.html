@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Doku Belleği Ölçümü — KTX2 / VRAM</title>
+    <title>KTX2 Texture Compression & VRAM Consumption Measurement</title>
     <style>
       :root {
         --cyan: #22d3ee;
@@ -391,55 +391,55 @@
     <div class="wrap">
       <header>
         <div class="eyebrow">Three.js · KTX2 &amp; VRAM</div>
-        <h1>Kargo Kutusu Küçüldü, Raf Küçülmedi</h1>
+        <h1>The Cargo Box Shrank, The Shelf Did Not</h1>
         <p>
-          Kargo = dosyanın diskte kapladığı yer. Raf = dokunun VRAM'de kapladığı yer. Gürültü kaydırıcısını oynatın: PNG
-          baytı megabaytlar arasında gezerken VRAM sütunu tek bayt kıpırdamaz. Ölçüm otomatik değil, düğmeyle
-          tetikleniyor; demo aynı anda en fazla <b>2</b> büyük doku canlı tutar ve üretimi <b>2048</b> ile sınırlar. 4K
-          satırları yalnızca <i>hesaplanır</i> — GPU'ya yüklenmez.
+          Cargo = space the file occupies on disk. Shelf = space the texture occupies in VRAM. Move the noise slider:
+          while PNG bytes swing across megabytes, the VRAM column does not budge a single byte. Measurement is triggered
+          manually via buttons, not automatically; the demo keeps at most <b>2</b> large textures alive simultaneously and
+          caps procedural generation at <b>2048</b>. 4K rows are only <i>calculated</i> — not uploaded to the GPU.
         </p>
       </header>
 
       <div class="grid">
         <main class="glass" id="stage">
-          <div class="stage-tag">Ölçülen sahne · <b>3 MESH, GÖLGE YOK</b></div>
+          <div class="stage-tag">Measured scene · <b>3 MESHES, NO SHADOWS</b></div>
         </main>
 
         <aside class="glass">
-          <div class="panel-head">ÜRET (PROSEDÜREL, İNDİRME YOK)</div>
+          <div class="panel-head">GENERATE (PROCEDURAL, NO DOWNLOADS)</div>
           <div class="row2">
             <button id="gen1024" class="accent-cyan">
-              <b>1024 üret</b>
-              <span>4 MiB taban</span>
+              <b>Generate 1024</b>
+              <span>4 MiB base</span>
             </button>
             <button id="gen2048" class="accent-cyan">
-              <b>2048 üret</b>
-              <span>16 MiB taban</span>
+              <b>Generate 2048</b>
+              <span>16 MiB base</span>
             </button>
           </div>
 
           <div class="slider">
-            <label for="noise">GÜRÜLTÜ (ENTROPİ) <b id="noiseVal">0</b></label>
+            <label for="noise">NOISE (ENTROPY) <b id="noiseVal">0</b></label>
             <input id="noise" type="range" min="0" max="100" step="1" value="0" />
           </div>
 
-          <div class="panel-head">ÖLÇ</div>
+          <div class="panel-head">MEASURE</div>
           <div class="btns">
             <button id="measure" class="accent-violet">
-              <b>Bütçeyi ölç</b>
+              <b>Measure budget</b>
               <span>TextureBudget + crossCheck</span>
             </button>
             <button id="filesize" class="accent-violet">
-              <b>Dosya boyutunu ölç (PNG/WebP)</b>
-              <span>canvas.toBlob — kargo sütunu</span>
+              <b>Measure file size (PNG/WebP)</b>
+              <span>canvas.toBlob — cargo column</span>
             </button>
             <button id="probe" class="accent-violet">
-              <b>Blok boyutunu doğrula (GPU)</b>
+              <b>Validate block size (GPU)</b>
               <span>compressedTexImage2D · INVALID_VALUE</span>
             </button>
             <button id="flush" class="accent-danger">
-              <b>Boşalt (dispose)</b>
-              <span>sayaç baseline'a dönmeli</span>
+              <b>Flush (dispose)</b>
+              <span>counter should return to baseline</span>
             </button>
           </div>
 
@@ -453,81 +453,81 @@
               <div class="v" id="statBaseline">0</div>
             </div>
             <div class="stat">
-              <div class="k">BÜTÇE (FORMÜL)</div>
+              <div class="k">BUDGET (FORMULA)</div>
               <div class="v neon" id="statBudget">0 B</div>
             </div>
             <div class="stat">
-              <div class="k">CANLI DOKU</div>
+              <div class="k">LIVE TEXTURES</div>
               <div class="v" id="statLive">0 / 2</div>
             </div>
           </div>
 
-          <label class="check"><input id="spin" type="checkbox" /> Döndür (varsayılan kapalı)</label>
+          <label class="check"><input id="spin" type="checkbox" /> Spin (off by default)</label>
 
           <div id="verdict">
-            Bir doku üretin, sonra <code>Bütçeyi ölç</code>. Sayaç doku <i>sayısını</i> verir; baytı formül verir.
+            Generate a texture, then click <code>Measure budget</code>. The counter provides texture <i>count</i>; the formula provides bytes.
           </div>
         </aside>
       </div>
 
       <section class="panels">
         <div class="glass panel">
-          <h2>GPU RAPORU · TRANSCODE HEDEFİ</h2>
+          <h2>GPU REPORT · TRANSCODE TARGET</h2>
           <p class="note">
-            <code>detectFormatSupport</code> ham WebGL uzantılarını, <code>KTX2Loader.detectSupport(renderer)</code> ise
-            three'nin kendi kararını okur. Alt tablo <code>pickTranscodeTarget</code> çıktısıdır: bu GPU'da ETC1S ve
-            UASTC yükleri hangi formata açılırdı?
+            <code>detectFormatSupport</code> inspects raw WebGL extensions, while <code>KTX2Loader.detectSupport(renderer)</code>
+            reads Three's internal decision. The table below shows <code>pickTranscodeTarget</code> output: to which format
+            would ETC1S and UASTC payloads transcode on this GPU?
           </p>
           <div id="gpuPanel"></div>
         </div>
 
         <div class="glass panel">
-          <h2>SÜRÜCÜ BLOK DOĞRULAMASI</h2>
+          <h2>DRIVER BLOCK VALIDATION</h2>
           <p class="note">
-            Sürücü, bizim blok hesabımızı denetleyen ücretsiz bir hakem: doğru boyutlu tamponu kabul eder, bir bayt
-            eksiğini <code>INVALID_VALUE</code> ile reddeder. 250×250 satırı <code>Math.ceil</code> gerektirir.
+            The driver acts as an objective referee verifying our block math: it accepts an exact-sized buffer and rejects
+            one byte short with <code>INVALID_VALUE</code>. The 250×250 row requires <code>Math.ceil</code>.
           </p>
           <div id="probePanel">
-            <div class="empty">— <code>Blok boyutunu doğrula (GPU)</code> düğmesini bekliyor.</div>
+            <div class="empty">— Awaiting <code>Validate block size (GPU)</code> click.</div>
           </div>
         </div>
 
         <div class="glass panel">
-          <h2>BÜTÇE TABLOSU (SAHNEYİ GEZEREK)</h2>
+          <h2>BUDGET TABLE (SCENE TRAVERSAL)</h2>
           <p class="note">
-            <code>TextureBudget</code> sahne grafiğini gezer, paylaşılan dokuyu bir kez sayar.
-            <code>crossCheck</code> renderer'ın sayacıyla karşılaştırır — <code>delta</code>'nın sıfır olması beklenmez,
-            alarm görevi görür.
+            <code>TextureBudget</code> traverses the scene graph, counting shared textures once.
+            <code>crossCheck</code> compares against the renderer counter — <code>delta</code> is not expected to be zero,
+            functioning as an alarm.
           </p>
           <div id="budgetPanel">
-            <div class="empty">— <code>Bütçeyi ölç</code> düğmesini bekliyor.</div>
+            <div class="empty">— Awaiting <code>Measure budget</code> click.</div>
           </div>
         </div>
 
         <div class="glass panel">
-          <h2>KARGO vs RAF (ÖLÇÜM GEÇMİŞİ)</h2>
+          <h2>CARGO vs SHELF (MEASUREMENT HISTORY)</h2>
           <p class="note">
-            Aynı doku, iki ölçek. Gürültüyü değiştirip yeniden üretin: PNG/WebP sütunları hareket eder, VRAM sütunu
-            sabit kalır. KTX2 hücresi boş — bu projede <b>encode edilmiyor</b>.
+            Same texture, two metrics. Modify noise and regenerate: PNG/WebP columns fluctuate, VRAM column remains fixed.
+            The KTX2 cell is blank — <b>not encoded</b> in this project.
           </p>
           <div id="sizePanel">
-            <div class="empty">— <code>Dosya boyutunu ölç (PNG/WebP)</code> düğmesini bekliyor.</div>
+            <div class="empty">— Awaiting <code>Measure file size (PNG/WebP)</code> click.</div>
           </div>
         </div>
 
         <div class="glass panel wide">
-          <h2>256 MiB'LIK RAFA NE SIĞAR · 4096² (YALNIZCA HESAPLANDI)</h2>
+          <h2>WHAT FITS ON A 256 MiB SHELF · 4096² (CALCULATED ONLY)</h2>
           <p class="note">
-            Bu satırlar GPU'ya yüklenmez, formülle hesaplanır — demoyu hafif tutmak için. Bütçe 268.435.456 bayt.
+            These rows are calculated via formula rather than uploaded to the GPU to keep the demo lightweight. Budget: 268,435,456 bytes.
           </p>
           <div id="planPanel"></div>
         </div>
       </section>
 
       <footer>
-        KTX2 dosyası bu projede encode EDİLMEZ (<code>toktx</code>/<code>basisu</code> global CLI ister). Ölçülen
-        şeyler: formül · transcode hedefi · sürücü blok doğrulaması · PNG/WebP baytı. Demo bir dev sunucusu ister —
-        <code>file://</code> ile boş ekran gelir.
+        KTX2 files are NOT encoded in this project (requires global <code>toktx</code>/<code>basisu</code> CLI). What is
+        measured: formula · transcode target · driver block validation · PNG/WebP bytes. The demo requires a dev server —
+        <code>file://</code> results in a blank screen.
       </footer>
     </div>
 

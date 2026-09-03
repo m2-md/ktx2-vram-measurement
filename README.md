@@ -1,80 +1,81 @@
-# Doku Belleği Ölçümü — Byte-per-pixel, KTX2 Transcode Hedefi ve Sürücü Blok Doğrulaması
+# Texture Memory Measurement — Byte-per-pixel, KTX2 Transcode Target and Driver Block Verification
 
-"Kargo Kutusu Küçüldü, Raf Küçülmedi: Tek Bir 4K Doku ~90 MB VRAM ve KTX2'nin Asıl
-Kazancı" makalesinin çalışan kodu. Bir dokunun **rafta** (VRAM'de) kapladığı yeri bir
-formüle döker, formülü vitest ile deterministik olarak kanıtlar ve tarayıcıda **sürücünün
-kendisine** doğrulatır: `compressedTexImage2D` yanlış boyutlu tamponu `INVALID_VALUE` ile
-reddeder.
+Working code for the article "The Shipping Box Shrank, the Shelf Didn't: A Single 4K Texture
+Is ~90 MB of VRAM and What KTX2 Actually Buys You". It turns the space a texture takes **on
+the shelf** (in VRAM) into a formula, proves that formula deterministically with vitest, and
+has **the driver itself** verify it in the browser: `compressedTexImage2D` rejects a
+wrongly-sized buffer with `INVALID_VALUE`.
 
-Kargo = dosyanın diskte/ağda kapladığı yer (PNG, WebP). Raf = dokunun GPU belleğinde
-kapladığı yer. İki sütun aynı yöne hareket etmez; demo bunu yan yana gösterir.
+Shipping box = the space the file takes on disk/over the network (PNG, WebP). Shelf = the
+space the texture takes in GPU memory. The two columns do not move in the same direction; the
+demo shows them side by side.
 
-Three.js 3D serisinin asset-pipeline kolundaki proje. Kardeş proje
-`threejs-dispose-vram-audit` ile aynı `RendererInfoLike` sözleşmesini paylaşır (sahte
-renderer ile GPU'suz test) ama derdi farklıdır: orada sızıntı, burada format ve bütçe.
+This is the asset-pipeline branch of the Three.js 3D series. It shares the same
+`RendererInfoLike` contract with its sibling project `threejs-dispose-vram-audit` (testing
+without a GPU via a fake renderer), but its concern is different: leaks there, format and
+budget here.
 
-Sürüm: `three@0.185.1` (r185), klasik `WebGLRenderer`. WebGPU'ya girmez.
+Version: `three@0.185.1` (r185), classic `WebGLRenderer`. It does not go near WebGPU.
 
-## ⚠️ KTX2 dosyası bu projede ENCODE EDİLMEZ
+## ⚠️ KTX2 files are NOT ENCODED in this project
 
-KTX2/Basis encode etmek `toktx` (KTX-Software) ya da `basisu` gibi **global bir CLI**
-ister; npm'den gelen saf-JS bir encoder yok. Bu depo global araç kurmuyor ve varlık
-indirmiyor. Dolayısıyla:
+Encoding KTX2/Basis requires a **global CLI** such as `toktx` (KTX-Software) or `basisu`;
+there is no pure-JS encoder on npm. This repo installs no global tools and downloads no
+assets. Therefore:
 
-- Tablolarda KTX2 dosya-boyutu hücresi **`— (encode edilmedi)`** olarak kalır. Oraya sayı
-  uydurulmaz.
-- Bunun yerine GERÇEKTEN ölçülen dört şey: **formül**, **transcode hedefi**, **sürücü blok
-  doğrulaması**, **PNG/WebP dosya boyutu**.
-- `KTX2Loader.detectSupport(renderer)` bir dosya indirmez, transcoder'ı bile başlatmaz —
-  yalnızca GPU'ya hangi sıkıştırılmış doku uzantılarının açık olduğunu sorar. Demo bu
-  raporu basar.
+- The KTX2 file-size cell in the tables stays as **`— (not encoded)`**. No number is invented
+  there.
+- What is ACTUALLY measured instead are four things: the **formula**, the **transcode
+  target**, the **driver block verification**, and the **PNG/WebP file size**.
+- `KTX2Loader.detectSupport(renderer)` downloads no file and does not even start the
+  transcoder — it only asks the GPU which compressed texture extensions are enabled. The demo
+  prints that report.
 
-## Ne içerir
+## What's inside
 
-- **`src/texture-memory.ts`** — rafın formülü. 20 girişli `FORMATS` tablosu (blok
-  genişliği/yüksekliği/baytı), `bytesPerPixel`, `levelBytes` (`Math.ceil` ile blok
-  hizalaması), `mipLevelCount` (`32 - Math.clz32(size)` — `Math.log2` DEĞİL),
-  `estimateTextureMemory` (mip zinciri + `layers`). Hiçbir şey import etmez; herkes ondan
-  alır.
-- **`src/three-format.ts`** — `THREE.Texture` → format/seviye/katman/boyut köprüsü.
-  Sıkıştırılmış format haritası, mip filtresi kümesi, `isDepthTexture`/`isCompressedTexture`/
-  `isCubeTexture` dalları.
-- **`src/texture-budget.ts`** — sahne grafiğini gezip formülle toplayan `TextureBudget`.
-  `Map` anahtarı doku **nesnesinin kendisi** → paylaşılan atlas bir kez sayılır.
-  `addMaterial` sabit slot listesi yerine `Object.entries` ile materyalin BÜTÜN doku
-  alanlarını tarar. `crossCheck` eşitlik iddia etmez, `{ counted, gpu, delta }` döndürür.
-- **`src/transcode-target.ts`** — `detectFormatSupport` (ham WebGL uzantıları) +
-  `pickTranscodeTarget`: three'nin `KTX2Loader.js` içindeki `FORMAT_OPTIONS` öncelik
-  tablosunun ETC1S/UASTC alt kümesinin taşınabilir portu (PVRTC ve UASTC_HDR satırları
-  bilerek dışarıda). ETC1S'in ASTC önceliği `Infinity` — ETC1S ASTC destekleyen
-  cihazda bile ASTC'ye gitmez. ETC1 satırı TEK elemanlıdır (alfa kanalı yok) ve
-  `engineFormat.length < 2` koruması alfalı dokuyu o satıra düşürmez.
-- **`src/block-probe.ts`** — `probeBlockSize`: İKİ YÖNLÜ deney. Doğru boyut kabul ediliyor
-  mu (`NO_ERROR`), bir bayt eksiği reddediliyor mu (`INVALID_VALUE`)? Bir hipotezi yalnızca
-  doğrulamaya çalışırsanız kendinizi kandırırsınız.
-- **`src/file-size.ts`** — `encodedSizes`: `canvas.toBlob` ile PNG/WebP gerçek baytı.
-  `blob.type === mime` kontrolü var: tarayıcı WebP üretemezse sessizce PNG döner.
-- **`src/procedural-texture.ts`** — `makeRng` (mulberry32) + `drawPattern`. Desen
-  PROSEDÜREL; hiçbir varlık indirilmez. Gürültü parametresi entropiyi (→ PNG baytını)
-  değiştirir, boyutu (→ VRAM'i) değiştirmez.
+- **`src/texture-memory.ts`** — the formula for the shelf. A 20-entry `FORMATS` table (block
+  width/height/bytes), `bytesPerPixel`, `levelBytes` (block alignment via `Math.ceil`),
+  `mipLevelCount` (`32 - Math.clz32(size)` — NOT `Math.log2`), `estimateTextureMemory` (mip
+  chain + `layers`). It imports nothing; everyone else takes from it.
+- **`src/three-format.ts`** — the `THREE.Texture` → format/level/layer/size bridge. Compressed
+  format map, mip filter set, `isDepthTexture`/`isCompressedTexture`/`isCubeTexture` branches.
+- **`src/texture-budget.ts`** — `TextureBudget`, which walks the scene graph and sums it up
+  with the formula. The `Map` key is the texture **object itself** → a shared atlas is counted
+  once. Instead of a fixed slot list, `addMaterial` scans ALL texture fields of the material
+  with `Object.entries`. `crossCheck` claims no equality, it returns
+  `{ counted, gpu, delta }`.
+- **`src/transcode-target.ts`** — `detectFormatSupport` (raw WebGL extensions) +
+  `pickTranscodeTarget`: a portable port of the ETC1S/UASTC subset of the `FORMAT_OPTIONS`
+  priority table inside three's `KTX2Loader.js` (PVRTC and UASTC_HDR rows deliberately left
+  out). ETC1S's ASTC priority is `Infinity` — ETC1S will not go to ASTC even on a device that
+  supports ASTC. The ETC1 row has a SINGLE element (no alpha channel) and the
+  `engineFormat.length < 2` guard keeps a texture with alpha from falling into that row.
+- **`src/block-probe.ts`** — `probeBlockSize`: a TWO-WAY experiment. Is the correct size
+  accepted (`NO_ERROR`), and is one byte short rejected (`INVALID_VALUE`)? If you only try to
+  confirm a hypothesis, you fool yourself.
+- **`src/file-size.ts`** — `encodedSizes`: real PNG/WebP bytes via `canvas.toBlob`. There is a
+  `blob.type === mime` check: if the browser cannot produce WebP it silently returns PNG.
+- **`src/procedural-texture.ts`** — `makeRng` (mulberry32) + `drawPattern`. The pattern is
+  PROCEDURAL; no asset is downloaded. The noise parameter changes entropy (→ PNG bytes), not
+  size (→ VRAM).
 - **`src/budget-plan.ts`** — `howManyFit`, `MOBILE_TEXTURE_BUDGET_BYTES = 268_435_456`,
   `comparisonRows`.
-- **`src/ktx2.ts`** — `createKTX2Loader` + `readWorkerConfig`. Transcoder yolu
-  `/basis/`'tir; dosyalar `npm run prepare-basis` ile node_modules'tan kopyalanır.
-- **`src/main.ts` + `src/view/stage.ts` + `index.html`** — tarayıcı demosu (dark cinematic
-  + neon). Ölçüm renderer'ı = sunum renderer'ı; tek context, tek sahne.
+- **`src/ktx2.ts`** — `createKTX2Loader` + `readWorkerConfig`. The transcoder path is
+  `/basis/`; the files are copied from node_modules by `npm run prepare-basis`.
+- **`src/main.ts` + `src/view/stage.ts` + `index.html`** — the browser demo (dark cinematic +
+  neon). The measurement renderer = the presentation renderer; one context, one scene.
 
-## Kurulum
+## Setup
 
 ```bash
 npm install
 ```
 
-`npm run dev` ve `npm run build` öncesinde `prepare-basis` otomatik koşar
-(`predev`/`prebuild`); elle çalıştırmak isterseniz:
+`prepare-basis` runs automatically before `npm run dev` and `npm run build`
+(`predev`/`prebuild`); if you want to run it by hand:
 
 ```bash
-npm run prepare-basis   # node_modules/three/.../libs/basis → public/basis/ (İNDİRME YOK)
+npm run prepare-basis   # node_modules/three/.../libs/basis → public/basis/ (NO DOWNLOAD)
 ```
 
 ## Test
@@ -83,11 +84,11 @@ npm run prepare-basis   # node_modules/three/.../libs/basis → public/basis/ (�
 npm test
 ```
 
-47 test — hepsi deterministik, **WebGL/GPU GEREKTİRMEZ** (Node'da koşar). `THREE.DataTexture`,
-`MeshStandardMaterial`, `Scene`, `WebGLRenderTarget`, `CompressedTexture`, `CubeTexture`
-WebGL context olmadan kurulur.
+47 tests — all deterministic, **NO WebGL/GPU REQUIRED** (they run in Node). `THREE.DataTexture`,
+`MeshStandardMaterial`, `Scene`, `WebGLRenderTarget`, `CompressedTexture`, `CubeTexture` are
+all constructed without a WebGL context.
 
-Beklenen çıktı:
+Expected output:
 
 ```
  ✓ test/budget-plan.test.ts       (6 tests)
@@ -100,81 +101,83 @@ Beklenen çıktı:
       Tests  47 passed (47)
 ```
 
-### Testlerin çivilediği deterministik sayılar
+### The deterministic numbers the tests nail down
 
-Kod hep bayt, tablolar hep MiB. Hepsi `estimateTextureMemory`'nin çıktısı — hiçbiri
-"yaklaşık" değil:
+The code is always in bytes, the tables always in MiB. All of them are the output of
+`estimateTextureMemory` — none of them is "approximately":
 
-| Doku | Format | Taban (B) | + mip zinciri (B) | MiB |
+| Texture | Format | Base (B) | + mip chain (B) | MiB |
 |---|---|---|---|---|
-| 4096² | RGBA16F | 134.217.728 | 178.956.968 | 170,67 |
-| 4096² | RGBA8 | 67.108.864 | **89.478.484** | 85,33 |
-| 4096² | BC7 / ASTC 4×4 | 16.777.216 | 22.369.648 | 21,33 |
-| 4096² | BC1 / ETC1 | 8.388.608 | 11.184.824 | 10,67 |
-| 2048² | RGBA8 | 16.777.216 | 22.369.620 | 21,33 |
-| 2048² | BC7 | 4.194.304 | 5.592.432 | 5,33 |
-| 2048² | BC1 | 2.097.152 | 2.796.216 | 2,67 |
-| 1000² (NPOT) | RGBA8 | 4.000.000 | 5.332.856 | 5,09 |
+| 4096² | RGBA16F | 134,217,728 | 178,956,968 | 170.67 |
+| 4096² | RGBA8 | 67,108,864 | **89,478,484** | 85.33 |
+| 4096² | BC7 / ASTC 4×4 | 16,777,216 | 22,369,648 | 21.33 |
+| 4096² | BC1 / ETC1 | 8,388,608 | 11,184,824 | 10.67 |
+| 2048² | RGBA8 | 16,777,216 | 22,369,620 | 21.33 |
+| 2048² | BC7 | 4,194,304 | 5,592,432 | 5.33 |
+| 2048² | BC1 | 2,097,152 | 2,796,216 | 2.67 |
+| 1000² (NPOT) | RGBA8 | 4,000,000 | 5,332,856 | 5.09 |
 
-- **`×4/3` bir sezgi, bütçe değil.** 4096² RGBA8'de gerçek 89.478.484 B, `4/3 × 67.108.864`
-  ise 89.478.485,33 → **1,33 bayt** fark. NPOT'ta sapma büyür (5.332.856 vs 5.333.333,33);
-  sıkıştırılmış formatlarda blok dolgusu yüzünden ters yöne döner.
-- **4096² BC7 (22.369.648) − 2048² RGBA8 (22.369.620) = 28 bayt.** Çözünürlüğü yarıya
-  indirmek, tam çözünürlükte BC7'ye geçmekle rafta neredeyse birebir aynı yeri kazandırıyor.
-- **256 MiB'lık (268.435.456 B) mobil bütçe:** mip'li 4K doku olarak **3** RGBA8, **11**
-  BC7, **23** BC1 sığar. Üç RGBA8 tam 268.435.452 B eder — geriye **4 bayt** kalır. BC7'de
-  on ikinci doku bütçeyi **320 baytla** aşar (kuyruk mip'lerindeki blok dolgusu).
-- **Alfa kanalı rafı ikiye katlar:** 4K BC1 10,67 MiB → BC3 21,33 MiB (tam olarak ×2).
-- Blok hizalaması: `levelBytes(5, 5, "BC1")` = **32** (2×2 blok), 12,5 değil.
-  `levelBytes(1, 1, "BC7")` = **16** — 4×4 bir mip ile tam olarak aynı.
+- **`×4/3` is an intuition, not a budget.** For 4096² RGBA8 the real number is 89,478,484 B,
+  while `4/3 × 67,108,864` is 89,478,485.33 → a **1.33 byte** difference. On NPOT the
+  deviation grows (5,332,856 vs 5,333,333.33); on compressed formats it flips direction
+  because of block padding.
+- **4096² BC7 (22,369,648) − 2048² RGBA8 (22,369,620) = 28 bytes.** Halving the resolution
+  saves you almost exactly as much shelf space as switching to BC7 at full resolution.
+- **A 256 MiB (268,435,456 B) mobile budget:** as mipped 4K textures, **3** RGBA8, **11** BC7,
+  **23** BC1 fit. Three RGBA8 come to exactly 268,435,452 B — leaving **4 bytes**. With BC7
+  the twelfth texture overshoots the budget by **320 bytes** (block padding in the tail mips).
+- **The alpha channel doubles the shelf:** 4K BC1 10.67 MiB → BC3 21.33 MiB (exactly ×2).
+- Block alignment: `levelBytes(5, 5, "BC1")` = **32** (2×2 blocks), not 12.5.
+  `levelBytes(1, 1, "BC7")` = **16** — exactly the same as a 4×4 mip.
 
-## Demo (tarayıcı)
+## Demo (browser)
 
 ```bash
 npm run dev
 ```
 
-`http://localhost:5173/` → sinematik sahne + cam kontrol paneli.
+`http://localhost:5173/` → cinematic scene + glass control panel.
 
-> Demo bir dev sunucusu ister. `index.html`'i `file://` ile açmak **boş ekran** verir
-> (Vite bare module specifier'ları çözer). Her zaman `npm run dev` kullanın.
+> The demo needs a dev server. Opening `index.html` with `file://` gives you a **blank screen**
+> (Vite resolves the bare module specifiers). Always use `npm run dev`.
 
-### Düğmeler
+### Buttons
 
-| Düğme / kontrol | Ne yapar |
+| Button / control | What it does |
 |---|---|
-| **1024 üret** / **2048 üret** | Prosedürel deseni bir `<canvas>`'a çizer, `CanvasTexture` olarak GPU'ya yükler (mip zinciri VAR). |
-| **Gürültü (entropi)** kaydırıcısı | 0 → düz gradyan (PNG küçük) · 100 → piksel başına sapma (PNG megabaytlara tırmanır). **VRAM sütununu etkilemez.** |
-| **Bütçeyi ölç** | `TextureBudget` sahneyi gezer, tabloyu ve `crossCheck` sonucunu basar. |
-| **Dosya boyutunu ölç (PNG/WebP)** | `canvas.toBlob` ile gerçek baytlar. Geçmiş tabloya birikir: gürültüyü değiştirip yeniden üretin, PNG oynar / VRAM sabit kalır. |
-| **Blok boyutunu doğrula (GPU)** | Desteklenen her format için 256×256 (tam blok) ve 250×250 (kısmi blok, `ceil` gerekir) probu. Her satır `exactAccepted ✓` ve `shortRejected ✓` göstermeli. |
-| **Boşalt (dispose)** | Dokuları materyalden koparıp `dispose()` eder; `renderer.info.memory.textures` **baseline'a dönmeli**. |
-| **Döndür** onay kutusu | Varsayılan **KAPALI**. Kapalıyken animasyon döngüsü yoktur, render on-demand. |
+| **Generate 1024** / **Generate 2048** | Draws the procedural pattern into a `<canvas>` and uploads it to the GPU as a `CanvasTexture` (mip chain INCLUDED). |
+| **Noise (entropy)** slider | 0 → flat gradient (small PNG) · 100 → per-pixel deviation (PNG climbs into megabytes). **Does not affect the VRAM column.** |
+| **Measure budget** | `TextureBudget` walks the scene, prints the table and the `crossCheck` result. |
+| **Measure file size (PNG/WebP)** | Real bytes via `canvas.toBlob`. History accumulates in the table: change the noise and regenerate, PNG moves / VRAM stays put. |
+| **Validate block size (GPU)** | For every supported format, a 256×256 (full block) and a 250×250 (partial block, needs `ceil`) probe. Every row should show `exactAccepted ✓` and `shortRejected ✓`. |
+| **Flush (dispose)** | Detaches the textures from the material and calls `dispose()`; `renderer.info.memory.textures` **should return to the baseline**. |
+| **Spin** checkbox | **OFF** by default. While off there is no animation loop, rendering is on-demand. |
 
-### Demo bilerek HAFİF
+### The demo is deliberately LIGHT
 
-Bütçe ölçen bir aracın kendi kendine sızdırması ironik olurdu — ve makineyi kasması daha da
-kötü. O yüzden:
+It would be ironic for a tool that measures budgets to leak on its own — and hammering the
+machine would be even worse. So:
 
-- Aynı anda **en fazla 2** canlı büyük doku. Üçüncü üretilirse en eskisi otomatik dispose
-  edilir (önce `material.map = null`, SONRA `texture.dispose()` — ters sırada three bir
-  sonraki render'da canvas'tan yeniden yükler ve sayaç geri tırmanır).
-- Prosedürel üretim üst sınırı **2048**. **4096 asla üretilmez**; 4K satırları yalnızca
-  HESAPLANIR ve tabloda `hesaplandı` etiketiyle gösterilir.
-- **Otomatik süpürme yok, otomatik ölçüm yok.** Her ölçüm düğmeyle tetiklenir.
-- Sahne en fazla 3 mesh, **gölge yok**, **post-process yok**, `pixelRatio ≤ 1.5`.
+- At most **2** live large textures at a time. If a third is generated, the oldest is disposed
+  automatically (first `material.map = null`, THEN `texture.dispose()` — in the reverse order
+  three re-uploads from the canvas on the next render and the counter climbs back up).
+- The procedural generation ceiling is **2048**. **4096 is never generated**; the 4K rows are
+  only CALCULATED and shown in the table with a `calculated` label.
+- **No automatic sweeping, no automatic measurement.** Every measurement is triggered by a
+  button.
+- The scene has at most 3 meshes, **no shadows**, **no post-processing**, `pixelRatio ≤ 1.5`.
 
-### Ölçüm koşulu (yoksa kendinizi kandırırsınız)
+### The measurement precondition (without it, you fool yourself)
 
-`renderer.info.memory.textures` yalnızca GPU'ya **yüklenmiş** dokuları sayar. Bir doku,
-onu kullanan mesh ilk kez çizilene kadar sayaca girmez. Bu yüzden demo her eylemden sonra
-tek bir `renderer.render()` çağırır ve `crossCheck`'i **render'dan sonra** yapar. Ayrıca
-`delta`'nın sıfır olması **beklenmez**: renderer bizim gezmediğimiz şeyleri de sayar
-(gölge haritaları, PMREM ara hedefleri, varsayılan 1×1 beyaz doku). `delta`'nın işi
-eşitlik ispatı değil, alarm.
+`renderer.info.memory.textures` only counts textures that have been **uploaded** to the GPU. A
+texture does not enter the counter until the mesh that uses it is drawn for the first time.
+That is why the demo calls a single `renderer.render()` after every action and does the
+`crossCheck` **after the render**. Also, `delta` is **not expected** to be zero: the renderer
+counts things we do not walk (shadow maps, PMREM intermediate targets, the default 1×1 white
+texture). The job of `delta` is not to prove equality, it is to raise an alarm.
 
-Blok probu ham `gl.compressedTexImage2D` çağırdığı için three'nin state cache'ini şaşırtır;
-demo probun ardından `renderer.resetState()` çağırır.
+Because the block probe calls raw `gl.compressedTexImage2D`, it confuses three's state cache;
+the demo calls `renderer.resetState()` after the probe.
 
 ## Build
 
@@ -182,13 +185,13 @@ demo probun ardından `renderer.resetState()` çağırır.
 npm run build   # prepare-basis && tsc && vite build → dist/
 ```
 
-## Makale ↔ kod paritesi
+## Article ↔ code parity
 
-Makaledeki 15 TypeScript bloğunun tamamı bu dosyalarda birebir bulunur. `TARGETS` tablosu
-sütun hizasını koruduğu için `// prettier-ignore` ile işaretlidir; `.prettierrc`
-(`printWidth: 120`) makaledeki tek satırlık `FORMATS` girişlerinin bölünmemesini sağlar.
-`(ilgili kısım)` / `(özet)` etiketli bloklar yalnızca `import` satırlarını eler.
+All 15 TypeScript blocks in the article are found verbatim in these files. The `TARGETS` table
+is marked with `// prettier-ignore` because it preserves column alignment; `.prettierrc`
+(`printWidth: 120`) keeps the one-line `FORMATS` entries from the article from being wrapped.
+Blocks labeled `(relevant part)` / `(excerpt)` only drop the `import` lines.
 
-## Lisans
+## License
 
-MIT — bkz. `LICENSE`.
+MIT — see `LICENSE`.
