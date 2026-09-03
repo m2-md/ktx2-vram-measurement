@@ -1,5 +1,9 @@
 # Texture Memory Measurement — Byte-per-pixel, KTX2 Transcode Target and Driver Block Verification
 
+<!-- LINKS:BEGIN — üretildi: scripts/sync-repo-links.py · elle düzenleme -->
+**▶ [Live demo](https://m2-md.github.io/ktx2-vram-measurement/)** · [Source](https://github.com/m2-md/ktx2-vram-measurement)
+<!-- LINKS:END -->
+
 Working code for the article "The Shipping Box Shrank, the Shelf Didn't: A Single 4K Texture
 Is ~90 MB of VRAM and What KTX2 Actually Buys You". It turns the space a texture takes **on
 the shelf** (in VRAM) into a formula, proves that formula deterministically with vitest, and
